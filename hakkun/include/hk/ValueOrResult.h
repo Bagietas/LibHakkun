@@ -58,6 +58,10 @@ namespace hk {
     class ValueOrResult<void> : public Result {
     public:
         using Type = Result;
+        ValueOrResult(Result result)
+            : Result(result) { }
+
+        ValueOrResult() = default;
     };
 
 #define HK_UNWRAP(VALUE)                                      \
@@ -76,6 +80,7 @@ namespace hk {
                 ::hk::diag::cAbortUnlessResultFormat,         \
                 _result_temp.getModule() + 2000,              \
                 _result_temp.getDescription(),                \
+                _result_temp.getValue(),                      \
                 "HK_UNWRAP(" #VALUE ")");                     \
         }                                                     \
     })()
