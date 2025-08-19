@@ -31,8 +31,8 @@ namespace hk::sf {
     class Service {
         friend class Request;
         friend struct Response;
-        Handle session;
-        std::optional<u32> object;
+        Handle mSession;
+        std::optional<u32> mObject;
         // Whether the session handle is owned by the current service.
         // Domain subservices don't own their own handles.
         bool ownedHandle;
@@ -46,23 +46,23 @@ namespace hk::sf {
         }
 
         static Service domainSubservice(Service* parent, u32 object) {
-            return Service(parent->session, object, false);
+            return Service(parent->mSession, object, false);
         }
 
         Service(Handle session, std::optional<u32> object, bool isRoot)
-            : session(session)
-            , object(object)
+            : mSession(session)
+            , mObject(object)
             , ownedHandle(isRoot) { }
 
     public:
         Service(Service&& old)
-            : session(old.session)
+            : mSession(old.mSession)
             , ownedHandle(old.ownedHandle) {
             old.ownedHandle = false;
         }
         Service(Handle handle)
-            : session(handle)
-            , object()
+            : mSession(handle)
+            , mObject()
             , ownedHandle(true) { }
         static Service fromHandle(Handle session) {
             return Service(session, std::nullopt, false);
@@ -70,17 +70,17 @@ namespace hk::sf {
 
         ~Service() {
             if (ownedHandle) {
-                svc::CloseHandle(session);
+                svc::CloseHandle(mSession);
                 HK_ABORT("closed when valid...", 0);
             }
         }
 
         Handle handle() {
-            return session;
+            return mSession;
         }
 
         bool isDomain() {
-            return object.has_value();
+            return mObject.has_value();
         }
 
         bool isDomainSubservice() {
@@ -102,109 +102,109 @@ namespace hk::sf {
     };
 
     class Request {
-        bool printRequest = false;
-        bool printResponse = false;
-        bool sendPid = false;
-        u8 hipcStaticIndex = 0;
-        u32 command;
-        u32 token = 0;
-        util::FixedCapacityArray<u32, 8> objects;
-        util::FixedCapacityArray<Handle, 8> hipcCopyHandles;
-        util::FixedCapacityArray<Handle, 8> hipcMoveHandles;
-        util::FixedCapacityArray<hipc::Static, 8> hipcSendStatics;
-        util::FixedCapacityArray<hipc::Buffer, 8> hipcSendBuffers;
-        util::FixedCapacityArray<hipc::Buffer, 8> hipcReceiveBuffers;
-        util::FixedCapacityArray<hipc::Buffer, 8> hipcExchangeBuffers;
-        util::FixedCapacityArray<hipc::ReceiveStatic, 8> hipcReceiveStatics;
-        std::span<const u8> data = {};
+        bool mPrintRequest = false;
+        bool mPrintResponse = false;
+        bool mSendPid = false;
+        u8 mHipcStaticIdx = 0;
+        u32 mCommandId = 0;
+        u32 mToken = 0;
+        util::FixedCapacityArray<u32, 8> mObjects;
+        util::FixedCapacityArray<Handle, 8> mHipcCopyHandles;
+        util::FixedCapacityArray<Handle, 8> mHipcMoveHandles;
+        util::FixedCapacityArray<hipc::Static, 8> mHipcSendStatics;
+        util::FixedCapacityArray<hipc::Buffer, 8> mHipcSendBuffers;
+        util::FixedCapacityArray<hipc::Buffer, 8> mHipcReceiveBuffers;
+        util::FixedCapacityArray<hipc::Buffer, 8> mHipcExchangeBuffers;
+        util::FixedCapacityArray<hipc::ReceiveStatic, 8> mHipcReceiveStatics;
+        std::span<const u8> mData = {};
 
     public:
         Request(u32 command)
-            : command(command) {
+            : mCommandId(command) {
         }
         template <typename T>
         Request(u32 command, const T* data, size size)
-            : command(command)
-            , data(cast<const u8*>(data), sizeof(T) * size) {
+            : mCommandId(command)
+            , mData(cast<const u8*>(data), sizeof(T) * size) {
         }
 
         void enableDebug(bool before, bool after) {
-            printRequest = before;
-            printResponse = after;
+            mPrintRequest = before;
+            mPrintResponse = after;
         }
 
         void setToken(u32 token) {
-            this->token = token;
+            this->mToken = token;
         }
 
         void setSendPid() {
-            sendPid = true;
+            mSendPid = true;
         }
 
         void addCopyHandle(Handle handle) {
-            hipcCopyHandles.add(handle);
+            mHipcCopyHandles.add(handle);
         }
 
         void addMoveHandle(Handle handle) {
-            hipcMoveHandles.add(handle);
+            mHipcMoveHandles.add(handle);
         }
 
         void addInAutoselect(hipc::BufferMode mode, void* data, u64 size) {
-            hipcSendStatics.add(hipc::Static(
-                hipcStaticIndex++,
+            mHipcSendStatics.add(hipc::Static(
+                mHipcStaticIdx++,
                 0,
                 0));
-            hipcSendBuffers.add(hipc::Buffer(
+            mHipcSendBuffers.add(hipc::Buffer(
                 mode,
                 u64(data),
                 u64(size)));
         }
 
         void addOutAutoselect(hipc::BufferMode mode, void* data, u64 size) {
-            hipcReceiveStatics.add(hipc::ReceiveStatic());
-            hipcReceiveBuffers.add(hipc::Buffer(
+            mHipcReceiveStatics.add(hipc::ReceiveStatic());
+            mHipcReceiveBuffers.add(hipc::Buffer(
                 mode,
                 u64(data),
                 size));
         }
 
         void addInPointer(hipc::BufferMode mode, void* data, u16 size) {
-            hipcSendStatics.add(hipc::Static(
-                hipcStaticIndex++,
+            mHipcSendStatics.add(hipc::Static(
+                mHipcStaticIdx++,
                 u64(data),
                 size));
         }
 
         void addOutPointer(hipc::BufferMode mode, void* data, u64 size) {
-            hipcReceiveStatics.add(hipc::ReceiveStatic());
-            hipcReceiveBuffers.add(hipc::Buffer(
+            mHipcReceiveStatics.add(hipc::ReceiveStatic());
+            mHipcReceiveBuffers.add(hipc::Buffer(
                 mode,
                 u64(data),
                 size));
         }
 
         void addOutFixedSizePointer(hipc::BufferMode mode, void* data, u16 size) {
-            hipcReceiveStatics.add(hipc::ReceiveStatic(
+            mHipcReceiveStatics.add(hipc::ReceiveStatic(
                 u64(data),
                 size));
         }
 
         void addInMapAlias(hipc::BufferMode mode, void* data, u64 size) {
-            hipcSendBuffers.add(hipc::Buffer(
+            mHipcSendBuffers.add(hipc::Buffer(
                 mode,
                 u64(data),
                 size));
         }
 
         void addOutMapAlias(hipc::BufferMode mode, void* data, u64 size) {
-            hipcReceiveBuffers.add(hipc::Buffer(
+            mHipcReceiveBuffers.add(hipc::Buffer(
                 mode,
                 u64(data),
                 size));
         }
 
         void addInOutMapAlias(hipc::BufferMode mode, void* data, u64 size) {
-            hipcExchangeBuffers.add(hipc::Buffer(
+            mHipcExchangeBuffers.add(hipc::Buffer(
                 mode,
                 u64(data),
                 size));
@@ -215,7 +215,7 @@ namespace hk::sf {
         void writeToTls(Service* service, cmif::MessageTag tag) {
             std::memset(svc::getTLS()->ipcMessageBuffer, 0, 256);
             util::Stream writer(svc::getTLS()->ipcMessageBuffer, sizeof(svc::ThreadLocalRegion::ipcMessageBuffer));
-            bool hasSpecialHeader = sendPid || !hipcCopyHandles.empty() || !hipcMoveHandles.empty();
+            bool hasSpecialHeader = mSendPid || !mHipcCopyHandles.empty() || !mHipcMoveHandles.empty();
 
             struct Sizes {
                 u16 hipcDataSize;
@@ -224,11 +224,11 @@ namespace hk::sf {
 
             Sizes sizes = [this, service]() {
                 u16 hipcDataSize = 16;
-                u16 cmifDataSize = sizeof(cmif::InHeader) + data.size_bytes();
+                u16 cmifDataSize = sizeof(cmif::InHeader) + mData.size_bytes();
 
                 if (!service->ownedHandle) {
                     hipcDataSize += sizeof(cmif::DomainInHeader);
-                    hipcDataSize += sizeof(u32) * objects.size();
+                    hipcDataSize += sizeof(u32) * mObjects.size();
                 }
 
                 hipcDataSize += cmifDataSize;
@@ -241,60 +241,60 @@ namespace hk::sf {
 
             writer.write(hipc::Header {
                 .tag = u16(tag),
-                .sendStaticCount = u8(hipcSendStatics.size()),
-                .sendBufferCount = u8(hipcSendBuffers.size()),
-                .recvBufferCount = u8(hipcReceiveBuffers.size()),
-                .exchBufferCount = u8(hipcExchangeBuffers.size()),
+                .sendStaticCount = u8(mHipcSendStatics.size()),
+                .sendBufferCount = u8(mHipcSendBuffers.size()),
+                .recvBufferCount = u8(mHipcReceiveBuffers.size()),
+                .exchBufferCount = u8(mHipcExchangeBuffers.size()),
                 .dataWords = u16(alignUp(sizes.hipcDataSize, 4) / 4),
                 .hasSpecialHeader = hasSpecialHeader,
             });
 
             if (hasSpecialHeader) {
                 writer.write(hipc::SpecialHeader {
-                    .sendPid = sendPid,
-                    .copyHandleCount = u8(hipcCopyHandles.size()),
-                    .moveHandleCount = u8(hipcCopyHandles.size()),
+                    .sendPid = mSendPid,
+                    .copyHandleCount = u8(mHipcCopyHandles.size()),
+                    .moveHandleCount = u8(mHipcCopyHandles.size()),
                 });
 
-                if (sendPid)
+                if (mSendPid)
                     writer.write<u64>(0);
 
-                writer.writeIterator<Handle>(hipcCopyHandles);
-                writer.writeIterator<Handle>(hipcMoveHandles);
+                writer.writeIterator<Handle>(mHipcCopyHandles);
+                writer.writeIterator<Handle>(mHipcMoveHandles);
             }
 
-            writer.writeIterator<hipc::Static>(hipcSendStatics);
-            writer.writeIterator<hipc::Buffer>(hipcSendBuffers);
-            writer.writeIterator<hipc::Buffer>(hipcReceiveBuffers);
-            writer.writeIterator<hipc::Buffer>(hipcExchangeBuffers);
+            writer.writeIterator<hipc::Static>(mHipcSendStatics);
+            writer.writeIterator<hipc::Buffer>(mHipcSendBuffers);
+            writer.writeIterator<hipc::Buffer>(mHipcReceiveBuffers);
+            writer.writeIterator<hipc::Buffer>(mHipcExchangeBuffers);
             writer.seek(alignUp(writer.tell(), 16));
 
             if (service->isDomain())
                 writer.write(cmif::DomainInHeader {
                     .tag = cmif::DomainTag::Request,
-                    .objectCount = u8(objects.size()),
+                    .objectCount = u8(mObjects.size()),
                     .dataSize = sizes.cmifDataSize,
-                    .objectId = service->object.value(),
-                    .token = token,
+                    .objectId = service->mObject.value(),
+                    .token = mToken,
                 });
 
             writer.write(cmif::InHeader {
                 .magic = cmif::cInHeaderMagic,
                 .version = 0,
-                .command = command,
-                .token = token,
+                .command = mCommandId,
+                .token = mToken,
             });
 
-            writer.writeIterator<u8>(data);
+            writer.writeIterator<u8>(mData);
             writer.seek(alignUp(writer.tell(), 4));
 
             if (service->isDomain())
-                writer.writeIterator<u32>(objects);
+                writer.writeIterator<u32>(mObjects);
 
             writer.seek(alignUp(writer.tell(), 16));
-            writer.writeIterator<hipc::ReceiveStatic>(hipcReceiveStatics);
+            writer.writeIterator<hipc::ReceiveStatic>(mHipcReceiveStatics);
 
-            if (printRequest) {
+            if (mPrintRequest) {
                 u8 buf[256] = {};
                 memcpy(buf, svc::getTLS()->ipcMessageBuffer, sizeof(svc::ThreadLocalRegion::ipcMessageBuffer));
                 diag::debugLog("");
@@ -389,16 +389,16 @@ namespace hk::sf {
     template <typename ResponseHandler>
     inline ValueOrResult<typename util::FunctionTraits<ResponseHandler>::ReturnType> Service::invoke(cmif::MessageTag tag, Request&& request, ResponseHandler handler) {
         request.writeToTls(this, tag);
-        HK_TRY(svc::SendSyncRequest(session));
-        auto response = Response::readFromTls(this, request.printResponse);
+        HK_TRY(svc::SendSyncRequest(mSession));
+        auto response = Response::readFromTls(this, request.mPrintResponse);
         HK_TRY(response.result);
         return handler(response);
     }
 
     inline Result Service::invoke(cmif::MessageTag tag, Request&& request) {
         request.writeToTls(this, tag);
-        HK_TRY(svc::SendSyncRequest(session));
-        auto response = Response::readFromTls(this, request.printResponse);
+        HK_TRY(svc::SendSyncRequest(mSession));
+        auto response = Response::readFromTls(this, request.mPrintResponse);
         return response.result;
     }
 }
